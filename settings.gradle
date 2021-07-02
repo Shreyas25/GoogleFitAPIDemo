@@ -1,0 +1,2 @@
+rootProject.name = "DemoGoogleFitAPI"
+include ':app'
