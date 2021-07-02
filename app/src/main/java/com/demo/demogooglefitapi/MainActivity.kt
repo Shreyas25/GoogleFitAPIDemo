@@ -25,6 +25,15 @@ import java.text.DecimalFormat
 import java.util.*
 import java.util.concurrent.TimeUnit
 
+
+/*Reference :
+# https://developers.google.com/fit/android/api-client-example
+# https://developers.google.com/fit/rest/v1/get-started?hl=en_US
+# https://developers.google.com/oauthplayground/
+
+ */
+
+
 enum class FitActionRequestCode {
     READ_DATA
 }
@@ -54,7 +63,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
 
         binding.btnLastWeekData.setOnClickListener { v ->
             requestForHistory()
-//            subscribeStepCount()
+//            subscribeStepCount() // Alternate approach
         }
     }
 
@@ -101,136 +110,6 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         getTodayData()
     }
 
-    private fun subscribeStepCount() {
-        Fitness.getRecordingClient(this, GoogleSignIn.getLastSignedInAccount(this))
-            .subscribe(DataType.TYPE_STEP_COUNT_CUMULATIVE);
-
-        readHistoricStepCount()
-    }
-
-    private fun readHistoricStepCount() {
-        // Invoke the History API to fetch the data with the query
-        Fitness.getHistoryClient(this, GoogleSignIn.getLastSignedInAccount(this))
-            .readData(queryFitnessData())
-            .addOnSuccessListener { dataReadResponse -> printData(dataReadResponse) }
-            .addOnFailureListener { e ->
-                Log.e(
-                    TAG,
-                    "There was a problem reading the historic data.",
-                    e
-                );
-            }
-
-    }
-
-    private fun queryFitnessData(): DataReadRequest {
-
-        val ESTIMATED_STEP_DELTAS = DataSource.Builder()
-            .setDataType(DataType.TYPE_STEP_COUNT_DELTA)
-            .setType(DataSource.TYPE_DERIVED)
-            .setStreamName("estimated_steps")
-            .setAppPackageName("com.google.android.gms")
-            .build()
-
-        /* val ESTIMATED_CALORIES = DataSource.Builder()
-             .setDataType(DataType.TYPE_CALORIES_EXPENDED)
-             .setType(DataSource.TYPE_DERIVED)
-             .setStreamName("merge_calories_expended")
-             .setAppPackageName("com.google.android.gms")
-             .build()*/
-
-        /*val dt = DateTime()
-        val endTime = dt.millis
-        val startTime = dt.minusWeeks(1).millis*/
-
-        val cal = Calendar.getInstance()
-        val _endTime = cal.time
-        cal.time = Date()
-        val endTime = cal.timeInMillis
-
-        cal.add(Calendar.DAY_OF_YEAR, -7)
-        val _startTime = cal.time
-        val startTime = _startTime.time
-
-        Log.i(TAG, "START TIME (millis): $startTime")
-        Log.i(TAG, "END TIME (millis): $endTime")
-//        Log.i(TAG, "START TIME : ${dt.minusWeeks(1)}")
-//        Log.i(TAG, "END TIME : $dt")
-
-        return DataReadRequest.Builder()
-            .aggregate(ESTIMATED_STEP_DELTAS, DataType.AGGREGATE_STEP_COUNT_DELTA)
-            .bucketByTime(1, TimeUnit.DAYS)
-            .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
-            .build();
-    }
-
-    private fun printData(dataReadResult: DataReadResponse) {
-        val result = StringBuilder()
-
-        dataReadResult?.let { dataReadResult ->
-            if (dataReadResult.buckets.size > 0) {
-                Log.i(
-                    TAG,
-                    "Number of returned buckets of DataSets is: " + dataReadResult.buckets.size
-                )
-
-                for (bucket in dataReadResult.buckets) {
-                    val dataSets = bucket.dataSets
-                    for (dataSet in dataSets) {
-                        result.append(formatDataSet(dataSet))
-                    }
-                }
-            } else if (dataReadResult.dataSets.size > 0) {
-                Log.i(
-                    TAG,
-                    "Number of returned DataSets is: " + dataReadResult.dataSets.size
-                )
-                for (dataSet in dataReadResult.dataSets) {
-                    result.append(formatDataSet(dataSet))
-                }
-            }
-        }
-
-        showData(result)
-
-    }
-
-    private fun showData(result: StringBuilder) {
-        binding.tvStepsRecord.text = result.toString()
-    }
-
-    private fun formatDataSet(dataSet: DataSet): String {
-        val result = java.lang.StringBuilder()
-        dataSet.let { dataSet ->
-            for (dp in dataSet.dataPoints) {
-                val sDT = DateTime(dp.getStartTime(TimeUnit.MILLISECONDS))
-                val eDT = DateTime(dp.getEndTime(TimeUnit.MILLISECONDS))
-
-                result.append(
-                    String.format(
-                        Locale.ENGLISH,
-                        "%s %s to %s %s\n",
-                        sDT.dayOfWeek().asShortText,
-                        sDT.toLocalTime().toString("HH:mm"),
-                        eDT.dayOfWeek().asShortText,
-                        eDT.toLocalTime().toString("HH:mm")
-                    )
-                )
-
-                result.append(
-                    String.format(
-                        Locale.ENGLISH,
-                        "%s: %s %s\n",
-                        sDT.dayOfWeek().asShortText,
-                        dp.getValue(dp.dataType.fields[0]).toString(),
-                        dp.dataType.fields[0].name
-                    )
-                )
-            }
-        }
-
-        return result.toString()
-    }
 
     //Fetch data for current day
     private fun getTodayData() {
@@ -444,6 +323,132 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Log.e(TAG, " calories today UI: ${fitnessDataResponseModel.calories}")
         Log.e(TAG, " distance today UI: ${fitnessDataResponseModel.distance}")
         Log.e(TAG, " weight today UI: ${fitnessDataResponseModel.weight}")
+    }
+
+    //Alternate Approach
+    private fun subscribeStepCount() {
+        Fitness.getRecordingClient(this, GoogleSignIn.getLastSignedInAccount(this))
+            .subscribe(DataType.TYPE_STEP_COUNT_CUMULATIVE);
+
+        readHistoricStepCount()
+    }
+
+    private fun readHistoricStepCount() {
+        // Invoke the History API to fetch the data with the query
+        Fitness.getHistoryClient(this, GoogleSignIn.getLastSignedInAccount(this))
+            .readData(queryFitnessData())
+            .addOnSuccessListener { dataReadResponse -> printData(dataReadResponse) }
+            .addOnFailureListener { e ->
+                Log.e(
+                    TAG,
+                    "There was a problem reading the historic data.",
+                    e
+                );
+            }
+
+    }
+
+    private fun queryFitnessData(): DataReadRequest {
+
+        // As the data fetched does no match with Google Fit App data,
+        // below code is used as a workaround for steps
+        val ESTIMATED_STEP_DELTAS = DataSource.Builder()
+            .setDataType(DataType.TYPE_STEP_COUNT_DELTA)
+            .setType(DataSource.TYPE_DERIVED)
+            .setStreamName("estimated_steps")
+            .setAppPackageName("com.google.android.gms")
+            .build()
+
+        //Joda time
+        /*val dt = DateTime()
+        val endTime = dt.millis
+        val startTime = dt.minusWeeks(1).millis*/
+
+        val cal = Calendar.getInstance()
+        val _endTime = cal.time
+        cal.time = Date()
+        val endTime = cal.timeInMillis
+
+        cal.add(Calendar.DAY_OF_YEAR, -7)
+        val _startTime = cal.time
+        val startTime = _startTime.time
+
+        Log.i(TAG, "START TIME (millis): $startTime")
+        Log.i(TAG, "END TIME (millis): $endTime")
+
+        return DataReadRequest.Builder()
+            .aggregate(ESTIMATED_STEP_DELTAS, DataType.AGGREGATE_STEP_COUNT_DELTA)
+            .bucketByTime(1, TimeUnit.DAYS)
+            .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
+            .build();
+    }
+
+    private fun printData(dataReadResult: DataReadResponse) {
+        val result = StringBuilder()
+
+        dataReadResult?.let { dataReadResult ->
+            if (dataReadResult.buckets.size > 0) {
+                Log.i(
+                    TAG,
+                    "Number of returned buckets of DataSets is: " + dataReadResult.buckets.size
+                )
+
+                for (bucket in dataReadResult.buckets) {
+                    val dataSets = bucket.dataSets
+                    for (dataSet in dataSets) {
+                        result.append(formatDataSet(dataSet))
+                    }
+                }
+            } else if (dataReadResult.dataSets.size > 0) {
+                Log.i(
+                    TAG,
+                    "Number of returned DataSets is: " + dataReadResult.dataSets.size
+                )
+                for (dataSet in dataReadResult.dataSets) {
+                    result.append(formatDataSet(dataSet))
+                }
+            }
+        }
+
+        showData(result)
+
+    }
+
+    private fun showData(result: StringBuilder) {
+        binding.tvStepsRecord.text = result.toString()
+    }
+
+    private fun formatDataSet(dataSet: DataSet): String {
+        val result = java.lang.StringBuilder()
+        dataSet.let { dataSet ->
+            for (dp in dataSet.dataPoints) {
+                val sDT = DateTime(dp.getStartTime(TimeUnit.MILLISECONDS))
+                val eDT = DateTime(dp.getEndTime(TimeUnit.MILLISECONDS))
+
+                result.append(
+                    String.format(
+                        Locale.ENGLISH,
+                        "%s %s to %s %s\n",
+                        sDT.dayOfWeek().asShortText,
+                        sDT.toLocalTime().toString("HH:mm"),
+                        eDT.dayOfWeek().asShortText,
+                        eDT.toLocalTime().toString("HH:mm")
+                    )
+                )
+
+                result.append(
+                    String.format(
+                        Locale.ENGLISH,
+                        "%s: %s %s\n",
+                        sDT.dayOfWeek().asShortText,
+                        dp.getValue(dp.dataType.fields[0]).toString(),
+                        dp.dataType.fields[0].name
+                    )
+                )
+            }
+        }
+
+        return result.toString()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
