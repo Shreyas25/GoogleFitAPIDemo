@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "com.demo.demogooglefitapi"
-        minSdkVersion 26 //21
+        minSdkVersion 21 //21
         targetSdkVersion 30
         versionCode 1
         versionName "1.0"
@@ -50,4 +50,6 @@ dependencies {
     //GOOGLE FIT
     implementation "com.google.android.gms:play-services-fitness:20.0.0"
     implementation "com.google.android.gms:play-services-auth:19.0.0"
+
+    implementation 'net.danlew:android.joda:2.10.9.1'
 }

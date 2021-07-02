@@ -15,17 +15,14 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.fitness.Fitness
 import com.google.android.gms.fitness.FitnessOptions
-import com.google.android.gms.fitness.data.DataPoint
-import com.google.android.gms.fitness.data.DataSet
-import com.google.android.gms.fitness.data.DataType
-import com.google.android.gms.fitness.data.Field
+import com.google.android.gms.fitness.data.*
 import com.google.android.gms.fitness.request.DataReadRequest
 import com.google.android.gms.fitness.result.DataReadResponse
 import com.google.android.gms.tasks.OnSuccessListener
 import com.google.android.material.snackbar.Snackbar
+import org.joda.time.DateTime
 import java.text.DecimalFormat
-import java.time.LocalDateTime
-import java.time.ZoneId
+import java.util.*
 import java.util.concurrent.TimeUnit
 
 enum class FitActionRequestCode {
@@ -55,7 +52,10 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
     private fun initialization() {
         fitnessDataResponseModel = FitnessDataResponseModel()
 
-        binding.btnLastWeekData.setOnClickListener { v -> requestForHistory() }
+        binding.btnLastWeekData.setOnClickListener { v ->
+            requestForHistory()
+//            subscribeStepCount()
+        }
     }
 
     private fun checkPermissions() {
@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
     private fun checkGoogleFitPermission() {
         fitnessOptions = FitnessOptions.builder()
             .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_STEP_COUNT_CUMULATIVE, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_CALORIES_EXPENDED, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_CALORIES_EXPENDED, FitnessOptions.ACCESS_READ)
@@ -100,6 +101,137 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         getTodayData()
     }
 
+    private fun subscribeStepCount() {
+        Fitness.getRecordingClient(this, GoogleSignIn.getLastSignedInAccount(this))
+            .subscribe(DataType.TYPE_STEP_COUNT_CUMULATIVE);
+
+        readHistoricStepCount()
+    }
+
+    private fun readHistoricStepCount() {
+        // Invoke the History API to fetch the data with the query
+        Fitness.getHistoryClient(this, GoogleSignIn.getLastSignedInAccount(this))
+            .readData(queryFitnessData())
+            .addOnSuccessListener { dataReadResponse -> printData(dataReadResponse) }
+            .addOnFailureListener { e ->
+                Log.e(
+                    TAG,
+                    "There was a problem reading the historic data.",
+                    e
+                );
+            }
+
+    }
+
+    private fun queryFitnessData(): DataReadRequest {
+
+        val ESTIMATED_STEP_DELTAS = DataSource.Builder()
+            .setDataType(DataType.TYPE_STEP_COUNT_DELTA)
+            .setType(DataSource.TYPE_DERIVED)
+            .setStreamName("estimated_steps")
+            .setAppPackageName("com.google.android.gms")
+            .build()
+
+        /* val ESTIMATED_CALORIES = DataSource.Builder()
+             .setDataType(DataType.TYPE_CALORIES_EXPENDED)
+             .setType(DataSource.TYPE_DERIVED)
+             .setStreamName("merge_calories_expended")
+             .setAppPackageName("com.google.android.gms")
+             .build()*/
+
+        /*val dt = DateTime()
+        val endTime = dt.millis
+        val startTime = dt.minusWeeks(1).millis*/
+
+        val cal = Calendar.getInstance()
+        val _endTime = cal.time
+        cal.time = Date()
+        val endTime = cal.timeInMillis
+
+        cal.add(Calendar.DAY_OF_YEAR, -7)
+        val _startTime = cal.time
+        val startTime = _startTime.time
+
+        Log.i(TAG, "START TIME (millis): $startTime")
+        Log.i(TAG, "END TIME (millis): $endTime")
+//        Log.i(TAG, "START TIME : ${dt.minusWeeks(1)}")
+//        Log.i(TAG, "END TIME : $dt")
+
+        return DataReadRequest.Builder()
+            .aggregate(ESTIMATED_STEP_DELTAS, DataType.AGGREGATE_STEP_COUNT_DELTA)
+            .bucketByTime(1, TimeUnit.DAYS)
+            .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
+            .build();
+    }
+
+    private fun printData(dataReadResult: DataReadResponse) {
+        val result = StringBuilder()
+
+        dataReadResult?.let { dataReadResult ->
+            if (dataReadResult.buckets.size > 0) {
+                Log.i(
+                    TAG,
+                    "Number of returned buckets of DataSets is: " + dataReadResult.buckets.size
+                )
+
+                for (bucket in dataReadResult.buckets) {
+                    val dataSets = bucket.dataSets
+                    for (dataSet in dataSets) {
+                        result.append(formatDataSet(dataSet))
+                    }
+                }
+            } else if (dataReadResult.dataSets.size > 0) {
+                Log.i(
+                    TAG,
+                    "Number of returned DataSets is: " + dataReadResult.dataSets.size
+                )
+                for (dataSet in dataReadResult.dataSets) {
+                    result.append(formatDataSet(dataSet))
+                }
+            }
+        }
+
+        showData(result)
+
+    }
+
+    private fun showData(result: StringBuilder) {
+        binding.tvStepsRecord.text = result.toString()
+    }
+
+    private fun formatDataSet(dataSet: DataSet): String {
+        val result = java.lang.StringBuilder()
+        dataSet.let { dataSet ->
+            for (dp in dataSet.dataPoints) {
+                val sDT = DateTime(dp.getStartTime(TimeUnit.MILLISECONDS))
+                val eDT = DateTime(dp.getEndTime(TimeUnit.MILLISECONDS))
+
+                result.append(
+                    String.format(
+                        Locale.ENGLISH,
+                        "%s %s to %s %s\n",
+                        sDT.dayOfWeek().asShortText,
+                        sDT.toLocalTime().toString("HH:mm"),
+                        eDT.dayOfWeek().asShortText,
+                        eDT.toLocalTime().toString("HH:mm")
+                    )
+                )
+
+                result.append(
+                    String.format(
+                        Locale.ENGLISH,
+                        "%s: %s %s\n",
+                        sDT.dayOfWeek().asShortText,
+                        dp.getValue(dp.dataType.fields[0]).toString(),
+                        dp.dataType.fields[0].name
+                    )
+                )
+            }
+        }
+
+        return result.toString()
+    }
+
     //Fetch data for current day
     private fun getTodayData() {
         Fitness.getHistoryClient(this, getGoogleAccount())
@@ -111,39 +243,51 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Fitness.getHistoryClient(this, getGoogleAccount())
             .readDailyTotal(DataType.TYPE_DISTANCE_DELTA)
             .addOnSuccessListener(this)
+        Fitness.getHistoryClient(this, getGoogleAccount())
+            .readDailyTotal(DataType.TYPE_WEIGHT)
+            .addOnSuccessListener(this)
     }
 
     private fun requestForHistory() {
-        val endTime = LocalDateTime.now().atZone(ZoneId.systemDefault())
+        //FOR API 26 and above
+        /*val endTime = LocalDateTime.now().atZone(ZoneId.systemDefault())
         val startTime = endTime.minusWeeks(1)
         Log.i(TAG, "Range Start: $startTime")
-        Log.i(TAG, "Range End: $endTime")
+        Log.i(TAG, "Range End: $endTime")*/
 
 
-        /*val cal = Calendar.getInstance()
+        val cal = Calendar.getInstance()
+        val _endTime = cal.time
         cal.time = Date()
         val endTime = cal.timeInMillis
-        cal.set(2021, 2, 5)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        val startTime = cal.timeInMillis*/
+
+        cal.add(Calendar.DAY_OF_YEAR, -7)
+        val _startTime = cal.time
+        val startTime = _startTime.time
+
+        Log.i(TAG, "Range Start BEFORE API 26: $_startTime")
+        Log.i(TAG, "Range End BEFORE API 26: $_endTime")
+        Log.i(TAG, "Range Start millis BEFORE API 26: $startTime")
+        Log.i(TAG, "Range End millis BEFORE API 26: $endTime")
 
 
         val readRequest = DataReadRequest.Builder()
-            .aggregate(DataType.TYPE_STEP_COUNT_DELTA)
+//            .aggregate(DataType.TYPE_STEP_COUNT_DELTA)
             .aggregate(DataType.AGGREGATE_STEP_COUNT_DELTA)
-            .aggregate(DataType.TYPE_CALORIES_EXPENDED)
+//            .aggregate(DataType.TYPE_CALORIES_EXPENDED)
             .aggregate(DataType.AGGREGATE_CALORIES_EXPENDED)
-            .aggregate(DataType.TYPE_DISTANCE_DELTA)
+//            .aggregate(DataType.TYPE_DISTANCE_DELTA)
             .aggregate(DataType.AGGREGATE_DISTANCE_DELTA)
+//            .aggregate(DataType.TYPE_HEIGHT)
             .bucketByTime(1, TimeUnit.DAYS)
-            .setTimeRange(startTime.toEpochSecond(), endTime.toEpochSecond(), TimeUnit.SECONDS)
+            .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
+            .setLimit(1)
             .build()
 
         Fitness.getHistoryClient(this, getGoogleAccount())
             .readData(readRequest)
             .addOnSuccessListener(this)
+
     }
 
     override fun onSuccess(d: Any?) {
@@ -160,6 +304,9 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                 fitnessDataResponseModel.steps = 0f
                 fitnessDataResponseModel.calories = 0f
                 fitnessDataResponseModel.distance = 0f
+                fitnessDataResponseModel.height = 0f
+                fitnessDataResponseModel.weight = 0f
+                fitnessDataResponseModel.moveMinutes = 0f
 
                 val dataReadResponse = d as DataReadResponse
 
@@ -169,11 +316,27 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                     if (bucketList != null && bucketList.isNotEmpty()) {
                         for (bucket in bucketList) {
                             val stepsDataSet = bucket.getDataSet(DataType.TYPE_STEP_COUNT_DELTA)
-                            getDataFromDataReadResponse(stepsDataSet)
-                            val caloriesDataSet = bucket.getDataSet(DataType.TYPE_CALORIES_EXPENDED)
-                            getDataFromDataReadResponse(caloriesDataSet)
-                            val distanceDataSet = bucket.getDataSet(DataType.TYPE_DISTANCE_DELTA)
-                            getDataFromDataReadResponse(distanceDataSet)
+                            stepsDataSet?.let {
+                                getDataFromDataReadResponse(it)
+                            }
+                            val caloriesDataSet =
+                                bucket.getDataSet(DataType.TYPE_CALORIES_EXPENDED)
+                            caloriesDataSet?.let {
+                                getDataFromDataReadResponse(it)
+                            }
+                            val distanceDataSet =
+                                bucket.getDataSet(DataType.TYPE_DISTANCE_DELTA)
+                            distanceDataSet?.let {
+                                getDataFromDataReadResponse(it)
+                            }
+                            val heightDataSet = bucket.getDataSet(DataType.TYPE_HEIGHT)
+                            heightDataSet?.let {
+                                getDataFromDataReadResponse(it)
+                            }
+                            val weightDataSet = bucket.getDataSet(DataType.TYPE_WEIGHT)
+                            weightDataSet?.let {
+                                getDataFromDataReadResponse(it)
+                            }
                         }
                     }
                 }
@@ -189,18 +352,32 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                 Log.e(TAG, " data manual history : " + dataPoint.originalDataSource.streamName)
                 val value = dataPoint.getValue(field).toString().toFloat()
                 Log.e(TAG, " data : $value")
-                if (field.name == Field.FIELD_STEPS.name) {
-                    fitnessDataResponseModel.steps =
-                        DecimalFormat("#.##").format(value + fitnessDataResponseModel.steps)
-                            .toFloat()
-                } else if (field.name == Field.FIELD_CALORIES.name) {
-                    fitnessDataResponseModel.calories =
-                        DecimalFormat("#.##").format(value + fitnessDataResponseModel.calories)
-                            .toFloat()
-                } else if (field.name == Field.FIELD_DISTANCE.name) {
-                    fitnessDataResponseModel.distance =
-                        DecimalFormat("#.##").format(value + fitnessDataResponseModel.distance)
-                            .toFloat()
+                when (field.name) {
+                    Field.FIELD_STEPS.name -> {
+                        fitnessDataResponseModel.steps =
+                            DecimalFormat("#.##").format(value + fitnessDataResponseModel.steps)
+                                .toFloat()
+                    }
+                    Field.FIELD_CALORIES.name -> {
+                        fitnessDataResponseModel.calories =
+                            DecimalFormat("#.##").format(value + fitnessDataResponseModel.calories)
+                                .toFloat()
+                    }
+                    Field.FIELD_DISTANCE.name -> {
+                        fitnessDataResponseModel.distance =
+                            DecimalFormat("#.##").format(value + fitnessDataResponseModel.distance)
+                                .toFloat()
+                    }
+                    Field.FIELD_HEIGHT.name -> {
+                        fitnessDataResponseModel.height =
+                            DecimalFormat("#.##").format(value + fitnessDataResponseModel.height)
+                                .toFloat()
+                    }
+                    Field.FIELD_WEIGHT.name -> {
+                        fitnessDataResponseModel.weight =
+                            DecimalFormat("#.##").format(value + fitnessDataResponseModel.weight)
+                                .toFloat()
+                    }
                 }
             }
         }
@@ -219,6 +396,8 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Log.e(TAG, " steps HISTORY: ${fitnessDataResponseModel.steps}")
         Log.e(TAG, " calories HISTORY: ${fitnessDataResponseModel.calories}")
         Log.e(TAG, " distance HISTORY: ${fitnessDataResponseModel.distance}")
+        Log.e(TAG, " height HISTORY: ${fitnessDataResponseModel.height}")
+        Log.e(TAG, " weight HISTORY: ${fitnessDataResponseModel.weight}")
     }
 
     private fun getDataFromDataSet(dataSet: DataSet) {
@@ -227,7 +406,6 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
             Log.e(TAG, " data manual : " + dataPoint.originalDataSource.streamName)
 
             for (field in dataPoint.dataType.fields) {
-//                var value = dataPoint.getValue(field).asString()
                 val value = dataPoint.getValue(field).toString().toFloat()
                 Log.e(TAG, " data : $value")
 
@@ -244,23 +422,28 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                         fitnessDataResponseModel.distance =
                             DecimalFormat("#.##").format(value.toDouble()).toFloat()
                     }
+                    Field.FIELD_WEIGHT.name -> {
+                        fitnessDataResponseModel.weight =
+                            DecimalFormat("#.##").format(value.toDouble()).toFloat()
+                    }
                 }
             }
         }
 
-        setDataToUI(fitnessDataResponseModel)
+        setTodayDataToUI(fitnessDataResponseModel)
 
     }
 
-    private fun setDataToUI(fitnessDataResponseModel: FitnessDataResponseModel) {
+    private fun setTodayDataToUI(fitnessDataResponseModel: FitnessDataResponseModel) {
         with(binding) {
             tvSteps.text = fitnessDataResponseModel.steps.toString()
             tvDistance.text = fitnessDataResponseModel.distance.toString()
             tvCalories.text = fitnessDataResponseModel.calories.toString()
         }
-        Log.e(TAG, " steps UI: ${fitnessDataResponseModel.steps}")
-        Log.e(TAG, " calories UI: ${fitnessDataResponseModel.calories}")
-        Log.e(TAG, " distance UI: ${fitnessDataResponseModel.distance}")
+        Log.e(TAG, " steps today UI: ${fitnessDataResponseModel.steps}")
+        Log.e(TAG, " calories today UI: ${fitnessDataResponseModel.calories}")
+        Log.e(TAG, " distance today UI: ${fitnessDataResponseModel.distance}")
+        Log.e(TAG, " weight today UI: ${fitnessDataResponseModel.weight}")
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -268,7 +451,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         if (resultCode == RESULT_OK && requestCode == GOOGLE_FIT_PERMISSIONS_REQUEST_CODE)
             startReadingData()
         else
-            Log.e(TAG, " distance : ${fitnessDataResponseModel.distance}")
+            Log.e(TAG, " resultCode : $resultCode")
     }
 
 
