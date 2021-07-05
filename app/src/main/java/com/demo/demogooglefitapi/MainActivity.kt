@@ -19,7 +19,6 @@ import com.google.android.gms.fitness.data.DataSource
 import com.google.android.gms.fitness.data.DataType
 import com.google.android.gms.fitness.request.DataReadRequest
 import com.google.android.gms.fitness.result.DataReadResponse
-import com.google.android.gms.tasks.OnSuccessListener
 import com.google.android.material.snackbar.Snackbar
 import org.joda.time.DateTime
 import java.util.*
@@ -60,8 +59,8 @@ class MainActivity : AppCompatActivity() {
     private fun initialization() {
 
         binding.btnFetchData.setOnClickListener { v ->
-//            subscribeStepCount() // Alternate approach
-            readHistoricStepCount()
+            subscribeStepCount() // Alternate approach
+//            readHistoricStepCount()
         }
     }
 
@@ -86,6 +85,7 @@ class MainActivity : AppCompatActivity() {
             .addDataType(DataType.TYPE_WEIGHT, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_HEIGHT, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_HEART_POINTS, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
             .build()
@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
 
     //Alternate Approach
     private fun subscribeStepCount() {
-        Fitness.getRecordingClient(this, GoogleSignIn.getLastSignedInAccount(this))
+        Fitness.getRecordingClient(this, getGoogleAccount())
             .subscribe(DataType.TYPE_STEP_COUNT_CUMULATIVE);
 
         readHistoricStepCount()
@@ -117,7 +117,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun readHistoricStepCount() {
         // Invoke the History API to fetch the data with the query
-        Fitness.getHistoryClient(this, GoogleSignIn.getLastSignedInAccount(this))
+        Fitness.getHistoryClient(this, getGoogleAccount())
             .readData(queryFitnessData())
             .addOnSuccessListener { dataReadResponse -> printData(dataReadResponse) }
             .addOnFailureListener { e ->
@@ -238,8 +238,7 @@ class MainActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode == RESULT_OK && requestCode == GOOGLE_FIT_PERMISSIONS_REQUEST_CODE)
-//            startReadingData()
-            Log.e(TAG, " resultCode : $resultCode Start reading data")
+            subscribeStepCount()
         else
             Log.e(TAG, " resultCode : $resultCode")
     }
