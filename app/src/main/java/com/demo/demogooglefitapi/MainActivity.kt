@@ -62,8 +62,9 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         fitnessDataResponseModel = FitnessDataResponseModel()
 
         binding.btnLastWeekData.setOnClickListener { v ->
-            requestForHistory()
+//            requestForHistory()
 //            subscribeStepCount() // Alternate approach
+            readHistoricStepCount()
         }
     }
 
@@ -85,6 +86,12 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
             .addDataType(DataType.AGGREGATE_CALORIES_EXPENDED, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_DISTANCE_DELTA, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_DISTANCE_DELTA, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_WEIGHT, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_HEIGHT, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_HEART_POINTS, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.AGGREGATE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
             .build()
 
 
@@ -125,8 +132,17 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Fitness.getHistoryClient(this, getGoogleAccount())
             .readDailyTotal(DataType.TYPE_WEIGHT)
             .addOnSuccessListener(this)
+        Fitness.getHistoryClient(this, getGoogleAccount())
+            .readDailyTotal(DataType.TYPE_HEIGHT)
+            .addOnSuccessListener(this)
+        Fitness.getHistoryClient(this, getGoogleAccount())
+            .readDailyTotal(DataType.TYPE_HEART_POINTS)
+            .addOnSuccessListener(this)
     }
 
+    /*
+    START AND END TIME FOR FETCHING DATA OF USER
+     */
     private fun requestForHistory() {
         //FOR API 26 and above
         /*val endTime = LocalDateTime.now().atZone(ZoneId.systemDefault())
@@ -134,13 +150,12 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Log.i(TAG, "Range Start: $startTime")
         Log.i(TAG, "Range End: $endTime")*/
 
-
         val cal = Calendar.getInstance()
         val _endTime = cal.time
         cal.time = Date()
         val endTime = cal.timeInMillis
 
-        cal.add(Calendar.DAY_OF_YEAR, -7)
+        cal.add(Calendar.DAY_OF_YEAR, -7) //PAST WEEK DATA
         val _startTime = cal.time
         val startTime = _startTime.time
 
@@ -157,11 +172,14 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
             .aggregate(DataType.AGGREGATE_CALORIES_EXPENDED)
 //            .aggregate(DataType.TYPE_DISTANCE_DELTA)
             .aggregate(DataType.AGGREGATE_DISTANCE_DELTA)
-//            .aggregate(DataType.TYPE_HEIGHT)
+            .aggregate(DataType.TYPE_HEIGHT)
+            .aggregate(DataType.TYPE_WEIGHT)
+            .aggregate(DataType.TYPE_HEART_POINTS)
             .bucketByTime(1, TimeUnit.DAYS)
             .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
             .setLimit(1)
             .build()
+
 
         Fitness.getHistoryClient(this, getGoogleAccount())
             .readData(readRequest)
@@ -216,6 +234,10 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                             weightDataSet?.let {
                                 getDataFromDataReadResponse(it)
                             }
+                            val heartPointsDataSet = bucket.getDataSet(DataType.TYPE_HEART_POINTS)
+                            heartPointsDataSet?.let {
+                                getDataFromDataReadResponse(it)
+                            }
                         }
                     }
                 }
@@ -257,6 +279,11 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                             DecimalFormat("#.##").format(value + fitnessDataResponseModel.weight)
                                 .toFloat()
                     }
+                    Field.FIELD_INTENSITY.name -> {
+                        fitnessDataResponseModel.heartPoints =
+                            DecimalFormat("#.##").format(value + fitnessDataResponseModel.heartPoints)
+                                .toFloat()
+                    }
                 }
             }
         }
@@ -277,6 +304,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Log.e(TAG, " distance HISTORY: ${fitnessDataResponseModel.distance}")
         Log.e(TAG, " height HISTORY: ${fitnessDataResponseModel.height}")
         Log.e(TAG, " weight HISTORY: ${fitnessDataResponseModel.weight}")
+        Log.e(TAG, " heart points HISTORY: ${fitnessDataResponseModel.heartPoints}")
     }
 
     private fun getDataFromDataSet(dataSet: DataSet) {
@@ -305,6 +333,10 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                         fitnessDataResponseModel.weight =
                             DecimalFormat("#.##").format(value.toDouble()).toFloat()
                     }
+                    Field.FIELD_HEIGHT.name -> {
+                        fitnessDataResponseModel.height =
+                            DecimalFormat("#.##").format(value.toDouble()).toFloat()
+                    }
                 }
             }
         }
@@ -323,6 +355,8 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Log.e(TAG, " calories today UI: ${fitnessDataResponseModel.calories}")
         Log.e(TAG, " distance today UI: ${fitnessDataResponseModel.distance}")
         Log.e(TAG, " weight today UI: ${fitnessDataResponseModel.weight}")
+        Log.e(TAG, " height today UI: ${fitnessDataResponseModel.height}")
+        Log.e(TAG, " heart points today UI: ${fitnessDataResponseModel.heartPoints}")
     }
 
     //Alternate Approach
@@ -352,7 +386,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
 
         // As the data fetched does no match with Google Fit App data,
         // below code is used as a workaround for steps
-        val ESTIMATED_STEP_DELTAS = DataSource.Builder()
+        val ESTIMATED = DataSource.Builder()
             .setDataType(DataType.TYPE_STEP_COUNT_DELTA)
             .setType(DataSource.TYPE_DERIVED)
             .setStreamName("estimated_steps")
@@ -369,7 +403,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         cal.time = Date()
         val endTime = cal.timeInMillis
 
-        cal.add(Calendar.DAY_OF_YEAR, -7)
+        cal.add(Calendar.DAY_OF_YEAR, -30)
         val _startTime = cal.time
         val startTime = _startTime.time
 
@@ -377,7 +411,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
         Log.i(TAG, "END TIME (millis): $endTime")
 
         return DataReadRequest.Builder()
-            .aggregate(ESTIMATED_STEP_DELTAS, DataType.AGGREGATE_STEP_COUNT_DELTA)
+            .aggregate(DataType.TYPE_STEP_COUNT_DELTA)
             .bucketByTime(1, TimeUnit.DAYS)
             .setTimeRange(startTime, endTime, TimeUnit.MILLISECONDS)
             .build();
@@ -428,9 +462,11 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                 result.append(
                     String.format(
                         Locale.ENGLISH,
-                        "%s %s to %s %s\n",
+                        "%s %s %s to %s %s %s\n",
+                        sDT.toLocalDate(),
                         sDT.dayOfWeek().asShortText,
                         sDT.toLocalTime().toString("HH:mm"),
+                        eDT.toLocalDate(),
                         eDT.dayOfWeek().asShortText,
                         eDT.toLocalTime().toString("HH:mm")
                     )
@@ -494,7 +530,10 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                         // Request permission
                         ActivityCompat.requestPermissions(
                             this,
-                            arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
+                            arrayOf(
+                                Manifest.permission.ACTIVITY_RECOGNITION,
+                                Manifest.permission.ACCESS_FINE_LOCATION,
+                            ),
                             requestCode.ordinal
                         )
                     }
@@ -506,7 +545,10 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                 // previously and checked "Never ask again".
                 ActivityCompat.requestPermissions(
                     this,
-                    arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
+                    arrayOf(
+                        Manifest.permission.ACTIVITY_RECOGNITION,
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                    ),
                     requestCode.ordinal
                 )
             }
@@ -556,7 +598,7 @@ class MainActivity : AppCompatActivity(), OnSuccessListener<Any> {
                         intent.action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
                         val uri = Uri.fromParts(
                             "package",
-                            "com.google.android.gms.fit.samples.stepcounterkotlin", null
+                            "com.demo.demogooglefitapi", null
                         )
                         intent.data = uri
                         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK

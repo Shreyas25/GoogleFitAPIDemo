@@ -6,5 +6,6 @@ data class FitnessDataResponseModel(
     var steps: Float = 0F,
     var height: Float = 0F,
     var weight: Float = 0F,
-    var moveMinutes:Float = 0F,
+    var moveMinutes: Float = 0F,
+    var heartPoints: Float = 0F
 )
