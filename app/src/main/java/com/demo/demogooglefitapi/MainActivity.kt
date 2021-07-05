@@ -86,7 +86,6 @@ class MainActivity : AppCompatActivity() {
             .addDataType(DataType.TYPE_WEIGHT, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_HEIGHT, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_HEART_POINTS, FitnessOptions.ACCESS_READ)
-            .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
             .build()
