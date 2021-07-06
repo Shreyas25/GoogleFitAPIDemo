@@ -76,7 +76,6 @@ class MainActivity : AppCompatActivity() {
     private fun checkGoogleFitPermission() {
         fitnessOptions = FitnessOptions.builder()
             .addDataType(DataType.TYPE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
-            .addDataType(DataType.TYPE_STEP_COUNT_CUMULATIVE, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_STEP_COUNT_DELTA, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_CALORIES_EXPENDED, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_CALORIES_EXPENDED, FitnessOptions.ACCESS_READ)
@@ -88,6 +87,14 @@ class MainActivity : AppCompatActivity() {
             .addDataType(DataType.AGGREGATE_HEART_POINTS, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.TYPE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
             .addDataType(DataType.AGGREGATE_MOVE_MINUTES, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_BASAL_METABOLIC_RATE, FitnessOptions.ACCESS_READ)
+            .addDataType(
+                DataType.TYPE_ACTIVITY_SEGMENT,
+                FitnessOptions.ACCESS_READ
+            ) //Provides only activity type (int—enum). The type of activity the user was doing.
+            .addDataType(DataType.TYPE_SPEED, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_BODY_FAT_PERCENTAGE, FitnessOptions.ACCESS_READ)
+            .addDataType(DataType.TYPE_HEART_RATE_BPM, FitnessOptions.ACCESS_READ)
             .build()
 
 
